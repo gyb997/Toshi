@@ -12,3 +12,9 @@ kind = "log"
 min_merge_size = 8
 min_layer_size = 10_000
 level_log_size = 0.75
+
+[block_devices]
+paths = [
+  "/dev/sdb0",
+  "/dev/sdb1"
+]

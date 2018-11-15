@@ -5,8 +5,11 @@ use log::error;
 use hyper::body::Body;
 use hyper::rt::Future;
 use hyper::{Client, Request};
+use serde_json;
 
 static CONSUL_PREFIX: &'static str = "services/toshi/";
+
+use cluster::node::Metadata;
 
 /// Stub struct for a connection to Consul
 pub struct ConsulInterface {
@@ -14,6 +17,8 @@ pub struct ConsulInterface {
     port:         String,
     scheme:       String,
     cluster_name: Option<String>,
+    block_devices: Vec<String>,
+    mount_points: Vec<String>,
     pub node_id:  Option<String>,
 }
 
@@ -70,9 +75,21 @@ impl ConsulInterface {
         })
     }
 
+    pub fn start_updates(&mut self) -> impl Future<Item = (), Error = ()> {
+            let uri = self.base_consul_url() + &self.cluster_name() + "/" + &self.node_id() + "/metadata/";
+            let client = Client::new();
+            let metadata = Metadata::gather(&self.block_devices, &self.mount_points);
+            let json_payload = serde_json::to_string(&metadata).unwrap();
+            let req = Request::builder().method("PUT").uri(uri).body(json_payload.into()).unwrap();
+            client.request(req).map(|_| ()).map_err(|e| {
+                error!("Error updating node metadata: {:?}", e);
+            })
+    }
+
     fn base_consul_url(&self) -> String { self.scheme.clone() + "://" + &self.address + ":" + &self.port + "/v1/kv/" + CONSUL_PREFIX }
 
     fn put_request(&self, uri: &str) -> Request<Body> { Request::builder().method("PUT").uri(uri).body(Body::empty()).unwrap() }
+
 
     fn cluster_name(&self) -> String { self.cluster_name.clone().unwrap() }
 
@@ -87,6 +104,8 @@ impl Default for ConsulInterface {
             scheme:       String::from("http"),
             cluster_name: None,
             node_id:      None,
+            mount_points: Vec::new(),
+            block_devices: Vec::new(),
         }
     }
 }

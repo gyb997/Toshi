@@ -52,7 +52,7 @@ impl Metadata {
     /// Gathers metadata from all the subsystems. Accepts a list of block devices or mount points
     /// about which to gather data. Note that the directories must be mountpoints (visible in mount)
     /// not just any arbitrary directory.
-    pub fn gather(block_devices: Vec<&str>, directories: Vec<&str>) -> Metadata {
+    pub fn gather(block_devices: &Vec<String>, directories: &Vec<String>) -> Metadata {
         let sys = systemstat::System::new();
         let start_time = time::SystemTime::now();
         let mut metadata = Metadata {
@@ -203,10 +203,6 @@ mod tests {
 
     #[test]
     fn test_ram_metadata() {
-        if cfg!(target_os = "macos") {
-            println!("Test not supported on macos yet");
-            return;
-        }
         let sys = systemstat::System::new();
         let ram_metadata = RAMMetadata::gather(&sys);
         assert!(ram_metadata.is_ok())

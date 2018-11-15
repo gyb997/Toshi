@@ -14,7 +14,7 @@ extern crate toshi;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::RwLock;
-
+use std::time::{Duration, Instant};
 use hyper::rt;
 
 use toshi::cluster;
@@ -78,6 +78,18 @@ pub fn runner() -> i32 {
                 .long("cluster-name")
                 .takes_value(true)
                 .default_value("kitsune"),
+        ).arg(
+            Arg::with_name("block-devices")
+                .long("block-devices")
+                .takes_value(true)
+                .multiple(true)
+                .required(false),
+        ).arg(
+            Arg::with_name("mount-points")
+                .long("mount-points")
+                .takes_value(true)
+                .multiple(true)
+                .required(false),
         ).get_matches();
 
     let settings = if options.is_present("config") {
@@ -119,6 +131,25 @@ pub fn runner() -> i32 {
     // Registers the node with Consul. Blocks since we don't want to proceed if we can't register.
     rt::run(reg_future);
 
+    // Collect any block devices and mount points the user specified
+    let mut block_devices: Vec<String> = Vec::new();
+    let mut mount_points: Vec<String> = Vec::new();
+    if let Some(bds) = options.values_of("block-devices") {
+        for device in bds {
+            block_devices.push(device.to_string());
+        }
+    }
+
+    if let Some(mps) = options.values_of("mount-points") {
+        for mount in mps {
+            mount_points.push(mount.to_string());
+        }
+    }
+
+    // Create an Interval that updates Consul with this node's metadata regularly
+    let update_interval = Duration::from_secs(60);
+    let node_updater = tokio::timer::Interval::new(Instant::now(), update_interval);
+    // Creates the index catalog
     let index_catalog = match IndexCatalog::new(PathBuf::from(&settings.path), settings.clone()) {
         Ok(v) => v,
         Err(e) => {
